@@ -14,14 +14,24 @@ LOG_PATH = "data/rain_watch_log.csv"
 REPORT_PATH = "docs/index.html"
 BOUNDS = {"lat_min": 1.15, "lat_max": 1.47, "lon_min": 103.59, "lon_max": 104.05}
 
-CATEGORIES = [
-    (["thunder"], "thundery", "#c084fc", "T"),
-    (["heavy rain", "moderate rain"], "rain", "#2b6cb0", "R"),
-    (["rain", "shower", "drizzle"], "light rain", "#4ea8de", "LR"),
-    (["hazy", "mist", "fog"], "hazy", "#a97142", "H"),
-    (["partly cloudy"], "partly cloudy", "#8fb8d9", "PC"),
-    (["cloudy", "overcast"], "cloudy", "#7f9aab", "C"),
-    (["fair", "sunny", "clear", "warm"], "sunny", "#f5b942", "S"),
+ICONS = [
+    (["thunder"], "⛈️"),
+    (["heavy rain", "moderate rain"], "🌧️"),
+    (["rain", "shower", "drizzle"], "🌦️"),
+    (["hazy", "mist", "fog"], "🌫️"),
+    (["partly cloudy"], "⛅"),
+    (["cloudy", "overcast"], "☁️"),
+    (["fair", "sunny", "clear", "warm"], "☀️"),
+]
+
+# Very rough silhouette of mainland Singapore's coastline (lat, lon), just
+# enough points to give the map visual context — not survey-accurate.
+SG_OUTLINE = [
+    (1.327, 103.636), (1.300, 103.660), (1.276, 103.705), (1.265, 103.775),
+    (1.263, 103.820), (1.265, 103.855), (1.290, 103.870), (1.300, 103.905),
+    (1.345, 103.965), (1.345, 104.010), (1.405, 103.985), (1.417, 103.955),
+    (1.445, 103.905), (1.462, 103.850), (1.462, 103.800), (1.445, 103.760),
+    (1.445, 103.700), (1.420, 103.680), (1.380, 103.660), (1.327, 103.636),
 ]
 
 
@@ -40,12 +50,12 @@ def pick(d, *keys):
     raise KeyError(f"none of {keys} found in {list(d.keys())}")
 
 
-def style_for(text):
+def icon_for(text):
     t = (text or "").lower()
-    for keywords, category, color, label in CATEGORIES:
+    for keywords, icon in ICONS:
         if any(k in t for k in keywords):
-            return category, color, label
-    return "unknown", "#555555", "?"
+            return icon
+    return "❔"
 
 
 def to_sgt(iso_str):
@@ -72,12 +82,10 @@ def get_forecast():
     areas = []
     for f in latest["forecasts"]:
         loc = locations.get(f["area"], {})
-        category, color, label = style_for(f["forecast"])
         areas.append({
             "name": f["area"],
             "text": f["forecast"],
-            "color": color,
-            "label": label,
+            "icon": icon_for(f["forecast"]),
             "is_rain": any(k in f["forecast"].lower() for k in ("rain", "shower", "thunder", "drizzle")),
             "lat": loc.get("latitude"),
             "lon": loc.get("longitude"),
@@ -128,8 +136,12 @@ def get_lightning_count():
 
 
 def build_map(areas, gauges):
-    parts = ['<svg viewBox="0 0 860 440" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">',
-             '<rect width="860" height="440" rx="10" fill="#0c1c2c"/>']
+    outline_points = " ".join(f"{x:.0f},{y:.0f}" for x, y in (project(lat, lon) for lat, lon in SG_OUTLINE))
+    parts = [
+        '<svg viewBox="0 0 860 440" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">',
+        '<rect width="860" height="440" rx="10" fill="#0c1c2c"/>',
+        f'<polygon points="{outline_points}" fill="#13293f" stroke="#2a5474" stroke-width="1.5"/>',
+    ]
 
     for g in gauges:
         if g["wet"] and g["lat"]:
@@ -142,12 +154,10 @@ def build_map(areas, gauges):
         if not a["lat"]:
             continue
         x, y = project(a["lat"], a["lon"])
-        parts.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="10" fill="{a["color"]}">'
-                     f'<title>{a["name"]}: {a["text"]}</title></circle>')
-        parts.append(f'<text x="{x:.0f}" y="{y:.0f}" font-size="8" font-weight="700" text-anchor="middle" '
-                     f'dominant-baseline="central" fill="#0a1420" font-family="monospace">{a["label"]}</text>')
-        parts.append(f'<text x="{x:.0f}" y="{y+18:.0f}" font-size="8" text-anchor="middle" '
-                     f'fill="#7f9aab" font-family="monospace">{a["name"]}</text>')
+        parts.append(f'<text x="{x:.0f}" y="{y:.0f}" font-size="20" text-anchor="middle" '
+                     f'dominant-baseline="central">{a["icon"]}<title>{a["name"]}: {a["text"]}</title></text>')
+        parts.append(f'<text x="{x:.0f}" y="{y+14:.0f}" font-size="8" text-anchor="middle" '
+                     f'fill="#dce6ea" font-family="monospace">{a["name"]}</text>')
 
     parts.append("</svg>")
     return "".join(parts)
@@ -200,10 +210,8 @@ def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count):
     <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">Weather by town</h2>
     {build_map(areas, gauges)}
     <div class="legend">
-      <span style="color:#f5b942;">● S sunny</span><span style="color:#8fb8d9;">● PC partly cloudy</span>
-      <span style="color:#7f9aab;">● C cloudy</span><span style="color:#4ea8de;">● LR light rain</span>
-      <span style="color:#2b6cb0;">● R rain</span><span style="color:#c084fc;">● T thundery</span>
-      <span style="color:#a97142;">● H hazy</span>
+      <span>☀️ sunny</span><span>⛅ partly cloudy</span><span>☁️ cloudy</span>
+      <span>🌦️ light rain</span><span>🌧️ rain</span><span>⛈️ thundery</span><span>🌫️ hazy</span>
       <span style="color:#e8654d;">◯ = gauge recording rain now</span>
     </div>
   </div>
