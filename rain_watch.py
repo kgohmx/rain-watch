@@ -20,15 +20,27 @@ import csv
 import json
 import os
 import webbrowser
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import requests
 
 FORECAST_URL = "https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast"
 RAINFALL_URL = "https://api-open.data.gov.sg/v2/real-time/api/rainfall"
+LIGHTNING_URL = "https://api-open.data.gov.sg/v2/real-time/api/lightning"
 
 LOG_PATH = "data/rain_watch_log.csv"
 REPORT_PATH = "docs/index.html"
+
+SGT = timezone(timedelta(hours=8))
+
+# Radar images aren't exposed as a clean official API, but NEA's radar
+# snapshots follow a predictable filename pattern (5-minute timestamps).
+# We try a couple of known URL patterns and step back a few 5-min ticks
+# in case the very latest one hasn't been published yet.
+RADAR_PATTERNS = {
+    "50km": "https://www.weather.gov.sg/files/rainarea/50km/v2/dpsri_70km_{ts}0000dBR.dpsri.png",
+    "240km": "https://www.weather.gov.sg/files/rainarea/240km/dpsri_240km_{ts}0000dBR.dpsri.png",
+}
 
 RADAR_LINKS = {
     "NEA / MSS official radar (50km)": "https://www.weather.gov.sg/weather-rain-area-50km/",
@@ -108,6 +120,75 @@ def fetch_rainfall():
     return latest.get("timestamp"), rows
 
 
+def fetch_lightning():
+    """Fetch recent lightning strikes. Returns (updated_time, strikes) where
+    each strike has lat/lon/type/time. Best-effort: NEA's lightning feed
+    schema isn't as stable as the others, so this fails soft."""
+    r = requests.get(LIGHTNING_URL, timeout=15)
+    r.raise_for_status()
+    payload = r.json()
+    data = payload.get("data", {})
+    records = get(data, "records", "readings", "items", default=[])
+    if not records:
+        return None, []
+
+    latest = records[-1]
+    updated = get(latest, "datetime", "timestamp", "updatedTimestamp")
+    readings = get(latest, "readings", "data", default=[])
+
+    strikes = []
+    for r_ in readings:
+        # Lightning data is typically GeoJSON-ish: a FeatureCollection or a
+        # flat list of {location, type, datetime}. Handle both shapes.
+        features = r_.get("features") if isinstance(r_, dict) else None
+        if features:
+            for feat in features:
+                coords = get(feat.get("geometry", {}), "coordinates", default=[None, None])
+                props = feat.get("properties", {})
+                strikes.append({
+                    "lon": coords[0] if len(coords) > 0 else None,
+                    "lat": coords[1] if len(coords) > 1 else None,
+                    "type": props.get("type"),
+                    "time": props.get("datetime") or props.get("time"),
+                })
+        elif isinstance(r_, dict) and ("lat" in r_ or "location" in r_):
+            loc = get(r_, "location", default={})
+            strikes.append({
+                "lon": loc.get("longitude", r_.get("lon")),
+                "lat": loc.get("latitude", r_.get("lat")),
+                "type": r_.get("type"),
+                "time": r_.get("datetime") or r_.get("time"),
+            })
+    return updated, strikes
+
+
+def round_down_5min(dt):
+    return dt.replace(minute=(dt.minute // 5) * 5, second=0, microsecond=0)
+
+
+def download_radar_image(range_key, out_path, max_steps_back=4):
+    """Try to fetch the current radar snapshot for a given range. Steps back
+    in 5-minute increments if the very latest frame isn't published yet.
+    Returns (success, frame_time_str) — never raises, so a bad guess about
+    NEA's URL pattern doesn't break the rest of the report."""
+    pattern = RADAR_PATTERNS[range_key]
+    now = round_down_5min(datetime.now(SGT))
+    for step in range(max_steps_back):
+        ts = now - timedelta(minutes=5 * step)
+        ts_str = ts.strftime("%Y%m%d%H%M")
+        url = pattern.format(ts=ts_str)
+        try:
+            resp = requests.get(url, timeout=10)
+            if resp.status_code == 200 and resp.headers.get("content-type", "").startswith("image"):
+                os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
+                with open(out_path, "wb") as f:
+                    f.write(resp.content)
+                return True, ts.strftime("%H:%M SGT")
+        except requests.RequestException:
+            continue
+    return False, None
+
+
 def append_log(forecast_rows, rainfall_rows, forecast_time, rainfall_time):
     rain_forecast_count = sum(1 for r in forecast_rows if r["is_rain"])
     wet_gauge_count = sum(1 for r in rainfall_rows if r["is_wet"])
@@ -128,9 +209,22 @@ def append_log(forecast_rows, rainfall_rows, forecast_time, rainfall_time):
     return rain_forecast_count, wet_gauge_count
 
 
-def write_report(forecast_time, forecast_rows, rainfall_time, rainfall_rows):
+def write_report(forecast_time, forecast_rows, rainfall_time, rainfall_rows,
+                  radar_status, lightning_time, strikes):
     rain_forecast_count = sum(1 for r in forecast_rows if r["is_rain"])
     wet_gauge_count = sum(1 for r in rainfall_rows if r["is_wet"])
+
+    recent_strikes = []
+    if strikes:
+        cutoff = datetime.now(SGT) - timedelta(minutes=30)
+        for s in strikes:
+            t = s.get("time")
+            try:
+                st = datetime.fromisoformat(t.replace("Z", "+00:00")) if t else None
+                if st and st.astimezone(SGT) >= cutoff:
+                    recent_strikes.append(s)
+            except (ValueError, AttributeError):
+                recent_strikes.append(s)  # can't parse time, count it anyway
 
     def forecast_row_html(r):
         cls = "rain" if r["is_rain"] else ""
@@ -141,10 +235,36 @@ def write_report(forecast_time, forecast_rows, rainfall_time, rainfall_rows):
         val = f'{r["value_mm"]:.1f} mm' if isinstance(r["value_mm"], (int, float)) else "—"
         return f'<div class="row"><span>{r["station"]}</span><span class="val {cls}">{val}</span></div>'
 
-    radar_links_html = "".join(
-        f'<a href="{url}" target="_blank" rel="noopener">{label} ↗</a>'
-        for label, url in RADAR_LINKS.items()
-    )
+    # Build <option>s for the radar dropdown: embedded ranges first (only if
+    # the image actually downloaded this run), then external fallback links.
+    radar_options = []
+    radar_images_html = []
+    for key, (ok, frame_time) in radar_status.items():
+        if ok:
+            radar_options.append(f'<option value="radar_{key}">NEA radar — {key} ({frame_time})</option>')
+            display = "block" if not radar_images_html else "none"
+            radar_images_html.append(
+                f'<img id="radar_{key}" src="radar_{key}.png" alt="NEA rain radar {key}" '
+                f'style="display:{display};width:100%;border-radius:8px;border:1px solid #1c3a4f;">'
+            )
+    for label, url in RADAR_LINKS.items():
+        safe_id = label.lower().replace(" ", "_").replace("/", "")
+        radar_options.append(f'<option value="link_{safe_id}" data-url="{url}">{label} (opens new tab)</option>')
+
+    has_embedded = any(ok for ok, _ in radar_status.values())
+    radar_select_html = f"""
+    <select id="radarSelect" onchange="onRadarChange()">
+      {"".join(radar_options)}
+    </select>
+    <div id="radarImages">{"".join(radar_images_html) if radar_images_html else '<p style="color:#7f9aab;font-size:13px;">Live radar snapshot unavailable this run — use a link below instead.</p>'}</div>
+    """
+
+    lightning_banner = ""
+    if recent_strikes:
+        lightning_banner = f"""
+    <div class="alert">⚡ {len(recent_strikes)} lightning strike(s) detected in the last 30 minutes.
+    NEA advises suspending outdoor activities when lightning is nearby.</div>"""
+    lightning_sub = f"{len(strikes)} strikes in latest reading" if strikes else "no strikes in latest reading"
 
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
@@ -167,11 +287,15 @@ def write_report(forecast_time, forecast_rows, rainfall_time, rainfall_rows):
   .val.rain, .val.wet {{ color:#e8a24d; font-weight:600; }}
   .radar-links {{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }}
   .radar-links a {{ background:#37c9a1; color:#0a1420; text-decoration:none; padding:8px 14px; border-radius:7px; font-weight:700; font-size:13px; font-family:monospace; }}
+  select {{ background:#10263a; color:#dce6ea; border:1px solid #1c3a4f; border-radius:7px; padding:8px 10px; font-family:monospace; font-size:13px; width:100%; margin-bottom:12px; }}
+  .alert {{ background:#3a2410; border:1px solid #e8a24d; color:#f0c48a; border-radius:10px; padding:12px 16px; margin-bottom:18px; font-size:13.5px; font-weight:600; }}
   footer {{ color:#7f9aab; font-size:12px; font-family:monospace; line-height:1.7; border-top:1px solid #1c3a4f; padding-top:14px; margin-top:10px; }}
 </style></head>
 <body><div class="wrap">
   <h1>Rain Watch SG</h1>
-  <div class="sub">generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} · forecast updated {forecast_time} · gauges updated {rainfall_time}</div>
+  <div class="sub">generated {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} · forecast updated {forecast_time} · gauges updated {rainfall_time} · lightning: {lightning_sub}</div>
+
+  {lightning_banner}
 
   <div class="summary">
     <div class="stat"><div class="num">{len(forecast_rows)}</div><div class="lbl">Areas in forecast</div></div>
@@ -180,8 +304,8 @@ def write_report(forecast_time, forecast_rows, rainfall_time, rainfall_rows):
   </div>
 
   <div class="panel" style="margin-bottom:20px;">
-    <h2>Live radar (visual ground truth)</h2>
-    <div class="radar-links">{radar_links_html}</div>
+    <h2>Live radar</h2>
+    {radar_select_html}
   </div>
 
   <div class="grid">
@@ -198,9 +322,24 @@ def write_report(forecast_time, forecast_rows, rainfall_time, rainfall_rows):
   <footer>
     Data: data.gov.sg / NEA (Meteorological Service Singapore).<br>
     Log file: <b>{LOG_PATH}</b> — every run appends a row, so you can chart forecast-vs-actual agreement over time.<br>
-    Re-run this script (<code>python rain_watch.py</code>) to refresh. Radar imagery itself isn't an open API, hence the links above for the true visual comparison.
+    Radar images are fetched from NEA's public file pattern, not an official documented API — if a range shows "unavailable," NEA likely changed something, use the link options instead.
   </footer>
-</div></body></html>"""
+</div>
+<script>
+function onRadarChange() {{
+  var sel = document.getElementById('radarSelect');
+  var opt = sel.options[sel.selectedIndex];
+  var val = opt.value;
+  if (val.startsWith('link_')) {{
+    window.open(opt.getAttribute('data-url'), '_blank');
+    return;
+  }}
+  document.querySelectorAll('#radarImages img').forEach(function(img) {{
+    img.style.display = (img.id === val) ? 'block' : 'none';
+  }});
+}}
+</script>
+</body></html>"""
 
     os.makedirs(os.path.dirname(REPORT_PATH) or ".", exist_ok=True)
     with open(REPORT_PATH, "w", encoding="utf-8") as f:
@@ -216,10 +355,28 @@ def main():
     rainfall_time, rainfall_rows = fetch_rainfall()
     print(f"  updated: {rainfall_time}, {len(rainfall_rows)} stations")
 
+    print("Fetching lightning observations...")
+    try:
+        lightning_time, strikes = fetch_lightning()
+        print(f"  updated: {lightning_time}, {len(strikes)} strikes in latest reading")
+    except Exception as e:
+        print(f"  lightning fetch failed (non-fatal): {e}")
+        lightning_time, strikes = None, []
+
+    print("Fetching radar snapshots...")
+    radar_status = {}
+    docs_dir = os.path.dirname(REPORT_PATH) or "."
+    for key in RADAR_PATTERNS:
+        out_path = os.path.join(docs_dir, f"radar_{key}.png")
+        ok, frame_time = download_radar_image(key, out_path)
+        radar_status[key] = (ok, frame_time)
+        print(f"  {key}: {'ok, frame ' + frame_time if ok else 'unavailable this run'}")
+
     rain_forecast_count, wet_gauge_count = append_log(
         forecast_rows, rainfall_rows, forecast_time, rainfall_time
     )
-    write_report(forecast_time, forecast_rows, rainfall_time, rainfall_rows)
+    write_report(forecast_time, forecast_rows, rainfall_time, rainfall_rows,
+                 radar_status, lightning_time, strikes)
 
     print()
     print(f"Areas forecast as rain/showers: {rain_forecast_count} / {len(forecast_rows)}")
