@@ -31,6 +31,15 @@ def fetch(url):
     return r.json()["data"]
 
 
+def pick(d, *keys):
+    """NEA has changed field casing between camelCase and snake_case before —
+    try each spelling in turn."""
+    for k in keys:
+        if k in d:
+            return d[k]
+    raise KeyError(f"none of {keys} found in {list(d.keys())}")
+
+
 def icon_for(text):
     t = (text or "").lower()
     for keywords, icon in ICONS:
@@ -57,7 +66,8 @@ def project(lat, lon):
 def get_forecast():
     data = fetch("https://api-open.data.gov.sg/v2/real-time/api/two-hr-forecast")
     latest = data["items"][-1]
-    locations = {a["name"]: a["labelLocation"] for a in data["areaMetadata"]}
+    area_meta = pick(data, "areaMetadata", "area_metadata")
+    locations = {a["name"]: pick(a, "labelLocation", "label_location") for a in area_meta}
 
     areas = []
     for f in latest["forecasts"]:
@@ -70,20 +80,22 @@ def get_forecast():
             "lat": loc.get("latitude"),
             "lon": loc.get("longitude"),
         })
-    return latest.get("updatedTimestamp"), areas
+    updated = latest.get("updatedTimestamp") or latest.get("updated_timestamp") or latest.get("timestamp")
+    return updated, areas
 
 
 def get_rainfall():
     data = fetch("https://api-open.data.gov.sg/v2/real-time/api/rainfall")
     latest = data["readings"][-1]
-    stations = {s["id"]: s for s in data["stations"]}
+    stations = {s.get("id", s.get("deviceId")): s for s in data["stations"]}
 
     gauges = []
     for reading in latest["data"]:
-        s = stations.get(reading["stationId"], {})
-        loc = s.get("location", {})
+        sid = reading.get("stationId", reading.get("station_id"))
+        s = stations.get(sid, {})
+        loc = s.get("location", s.get("labelLocation", {}))
         gauges.append({
-            "name": s.get("name", reading["stationId"]),
+            "name": s.get("name", sid),
             "mm": reading["value"],
             "wet": reading["value"] > 0.2,
             "lat": loc.get("latitude"),
