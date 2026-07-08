@@ -90,7 +90,7 @@ def get_forecast():
             "lat": loc.get("latitude"),
             "lon": loc.get("longitude"),
         })
-    updated = latest.get("updatedTimestamp") or latest.get("updated_timestamp") or latest.get("timestamp")
+    updated = latest.get("update_timestamp") or latest.get("timestamp")
     return updated, areas
 
 
