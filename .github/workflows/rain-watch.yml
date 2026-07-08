@@ -3,7 +3,7 @@ name: Rain Watch SG
 on:
   schedule:
     # Every 30 minutes. GitHub may delay this slightly under load — that's normal.
-    - cron: "*/5 * * * *"
+    - cron: "7,22,37,52 * * * *"
   workflow_dispatch: {}   # lets you trigger a run manually from the Actions tab
 
 permissions:
