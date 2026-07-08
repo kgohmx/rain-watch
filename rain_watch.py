@@ -114,6 +114,23 @@ def get_rainfall():
     return latest.get("timestamp"), gauges
 
 
+def get_station_readings(url):
+    """Shared logic for air-temperature and relative-humidity, which use the
+    same station/reading shape as rainfall."""
+    data = fetch(url)
+    latest = data["readings"][-1]
+    values = [reading["value"] for reading in latest["data"]]
+    return latest.get("timestamp"), values
+
+
+def get_temperature():
+    return get_station_readings("https://api-open.data.gov.sg/v2/real-time/api/air-temperature")
+
+
+def get_humidity():
+    return get_station_readings("https://api-open.data.gov.sg/v2/real-time/api/relative-humidity")
+
+
 def get_lightning_count():
     """Returns how many strikes were recorded in the last 30 minutes.
     Best-effort — NEA's lightning feed schema is less predictable than the
@@ -133,6 +150,41 @@ def get_lightning_count():
         return count
     except Exception:
         return 0
+
+
+def get_current_weather():
+    """24-hour general outlook + live average temperature/humidity, for a
+    'right now' summary alongside the 2-hour forecast map. Best-effort: if
+    any piece fails, that piece is just skipped rather than breaking the report."""
+    try:
+        outlook_data = fetch("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast")
+        general = outlook_data["records"][-1]["general"]
+        outlook = {
+            "forecast": general["forecast"],
+            "temp_low": general["temperature"]["low"],
+            "temp_high": general["temperature"]["high"],
+            "humidity_low": general["relative_humidity"]["low"],
+            "humidity_high": general["relative_humidity"]["high"],
+        }
+    except Exception as e:
+        print(f"  24hr outlook fetch failed (non-fatal): {e}")
+        outlook = None
+
+    try:
+        _, temps = get_temperature()
+        avg_temp = round(sum(temps) / len(temps), 1) if temps else None
+    except Exception as e:
+        print(f"  air temperature fetch failed (non-fatal): {e}")
+        avg_temp = None
+
+    try:
+        _, humidities = get_humidity()
+        avg_humidity = round(sum(humidities) / len(humidities)) if humidities else None
+    except Exception as e:
+        print(f"  humidity fetch failed (non-fatal): {e}")
+        avg_humidity = None
+
+    return outlook, avg_temp, avg_humidity
 
 
 def build_map(areas, gauges):
@@ -176,11 +228,26 @@ def log_run(areas, gauges, forecast_time, rainfall_time):
                     len(gauges), sum(g["wet"] for g in gauges)])
 
 
-def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count):
+def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity):
     rain_count = sum(a["is_rain"] for a in areas)
     wet_count = sum(g["wet"] for g in gauges)
     alert = (f'<div class="alert">⚡ {lightning_count} lightning strike(s) in the last 30 minutes — '
              f'NEA advises suspending outdoor activities.</div>') if lightning_count else ""
+
+    current_weather_html = ""
+    if outlook or avg_temp is not None or avg_humidity is not None:
+        bits = []
+        if avg_temp is not None:
+            bits.append(f'<div class="stat"><b>{avg_temp}°C</b><span>Current avg. temperature</span></div>')
+        if avg_humidity is not None:
+            bits.append(f'<div class="stat"><b>{avg_humidity}%</b><span>Current avg. humidity</span></div>')
+        if outlook:
+            bits.append(f'<div class="stat"><b>{outlook["temp_low"]}–{outlook["temp_high"]}°C</b><span>Today\'s range</span></div>')
+        current_weather_html = f"""
+  <div class="panel" style="margin-bottom:18px;">
+    <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">Current weather{f' — {outlook["forecast"]}' if outlook else ''}</h2>
+    <div class="stats" style="margin-bottom:0;">{''.join(bits)}</div>
+  </div>"""
 
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Rain Watch SG</title>
@@ -201,6 +268,7 @@ def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count):
   <h1>Rain Watch SG</h1>
   <div class="sub">forecast updated {to_sgt(forecast_time)} · gauges updated {to_sgt(rainfall_time)}</div>
   {alert}
+  {current_weather_html}
   <div class="stats">
     <div class="stat"><b>{len(areas)}</b><span>Towns in forecast</span></div>
     <div class="stat"><b>{rain_count}</b><span>Forecast as rain/showers</span></div>
@@ -227,13 +295,15 @@ def main():
     forecast_time, areas = get_forecast()
     rainfall_time, gauges = get_rainfall()
     lightning_count = get_lightning_count()
+    outlook, avg_temp, avg_humidity = get_current_weather()
 
     log_run(areas, gauges, forecast_time, rainfall_time)
-    build_report(forecast_time, areas, rainfall_time, gauges, lightning_count)
+    build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity)
 
     print(f"Forecast: {len(areas)} towns, {sum(a['is_rain'] for a in areas)} showing rain")
     print(f"Gauges: {len(gauges)} stations, {sum(g['wet'] for g in gauges)} currently wet")
     print(f"Lightning strikes in last 30 min: {lightning_count}")
+    print(f"Current weather: {outlook}, avg temp {avg_temp}, avg humidity {avg_humidity}")
     print(f"Report: {os.path.abspath(REPORT_PATH)}")
 
 
