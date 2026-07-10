@@ -12,8 +12,6 @@ import requests
 SGT = timezone(timedelta(hours=8))
 LOG_PATH = "data/rain_watch_log.csv"
 REPORT_PATH = "docs/index.html"
-BOUNDS = {"lat_min": 1.15, "lat_max": 1.47, "lon_min": 103.59, "lon_max": 104.05}
-
 ICONS = [
     (["thunder"], "⛈️"),
     (["heavy rain", "moderate rain"], "🌧️"),
@@ -22,16 +20,6 @@ ICONS = [
     (["partly cloudy"], "⛅"),
     (["cloudy", "overcast"], "☁️"),
     (["fair", "sunny", "clear", "warm"], "☀️"),
-]
-
-# Very rough silhouette of mainland Singapore's coastline (lat, lon), just
-# enough points to give the map visual context — not survey-accurate.
-SG_OUTLINE = [
-    (1.327, 103.636), (1.300, 103.660), (1.276, 103.705), (1.265, 103.775),
-    (1.263, 103.820), (1.265, 103.855), (1.290, 103.870), (1.300, 103.905),
-    (1.345, 103.965), (1.345, 104.010), (1.405, 103.985), (1.417, 103.955),
-    (1.445, 103.905), (1.462, 103.850), (1.462, 103.800), (1.445, 103.760),
-    (1.445, 103.700), (1.420, 103.680), (1.380, 103.660), (1.327, 103.636),
 ]
 
 
@@ -65,12 +53,6 @@ def to_sgt(iso_str):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=SGT)
     return dt.astimezone(SGT).strftime("%Y-%m-%d %H:%M") + " SGT (UTC+8)"
-
-
-def project(lat, lon):
-    x = (lon - BOUNDS["lon_min"]) / (BOUNDS["lon_max"] - BOUNDS["lon_min"]) * 820 + 20
-    y = (1 - (lat - BOUNDS["lat_min"]) / (BOUNDS["lat_max"] - BOUNDS["lat_min"])) * 400 + 20
-    return x, y
 
 
 def get_forecast():
@@ -192,6 +174,38 @@ def get_four_day_outlook():
     except Exception as e:
         print(f"  4-day outlook fetch failed (non-fatal): {e}")
         return []
+PSI_LEVELS = [
+    (50, "Good", "#37c9a1"),
+    (100, "Moderate", "#8fb8d9"),
+    (200, "Unhealthy", "#e8a24d"),
+    (300, "Very Unhealthy", "#e8654d"),
+    (float("inf"), "Hazardous", "#c084fc"),
+]
+
+
+def psi_category(value):
+    if value is None:
+        return "—", "#555555"
+    for threshold, label, color in PSI_LEVELS:
+        if value <= threshold:
+            return label, color
+    return "—", "#555555"
+
+
+def get_psi():
+    """PSI (24-hr Pollutant Standards Index) by region. Best-effort — schema
+    not yet confirmed against a real response, so a mismatch here just
+    results in an empty reading rather than breaking the report."""
+    try:
+        data = fetch("https://api-open.data.gov.sg/v2/real-time/api/psi")
+        latest = data["items"][-1]
+        readings = latest["readings"]["psi_twenty_four_hourly"]
+        return latest.get("timestamp"), readings
+    except Exception as e:
+        print(f"  PSI fetch failed (non-fatal): {e}")
+        return None, {}
+
+
 def get_current_weather():
     """24-hour general outlook + live average temperature/humidity, for a
     'right now' summary alongside the 2-hour forecast map. Best-effort: if
@@ -225,6 +239,30 @@ def get_current_weather():
         avg_humidity = None
 
     return outlook, avg_temp, avg_humidity
+
+
+def build_air_quality_html(psi_time, psi_readings):
+    if not psi_readings:
+        return ""
+    order = ["national", "north", "south", "east", "west", "central"]
+    cards = []
+    for region in order:
+        if region not in psi_readings:
+            continue
+        value = psi_readings[region]
+        label, color = psi_category(value)
+        cards.append(f"""
+        <div class="stat">
+          <b style="color:{color};">{value}</b>
+          <span>{region.capitalize()} — {label}</span>
+        </div>""")
+    if not cards:
+        return ""
+    return f"""
+  <div class="panel" style="margin-bottom:18px;">
+    <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">Air quality (PSI, 24-hr) — updated {to_sgt(psi_time)}</h2>
+    <div class="stats" style="margin-bottom:0;">{"".join(cards)}</div>
+  </div>"""
 
 
 def build_outlook_strip(outlook, four_day):
@@ -264,31 +302,48 @@ def build_outlook_strip(outlook, four_day):
 
 
 def build_map(areas, gauges):
-    outline_points = " ".join(f"{x:.0f},{y:.0f}" for x, y in (project(lat, lon) for lat, lon in SG_OUTLINE))
-    parts = [
-        '<svg viewBox="0 0 860 440" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;">',
-        '<rect width="860" height="440" rx="10" fill="#0c1c2c"/>',
-        f'<polygon points="{outline_points}" fill="#13293f" stroke="#2a5474" stroke-width="1.5"/>',
+    import json as _json
+
+    towns = [
+        {"lat": a["lat"], "lon": a["lon"], "icon": a["icon"], "name": a["name"], "text": a["text"]}
+        for a in areas if a["lat"]
     ]
+    wet_gauges = [
+        {"lat": g["lat"], "lon": g["lon"], "mm": g["mm"], "name": g["name"]}
+        for g in gauges if g["wet"] and g["lat"]
+    ]
+    towns_json = _json.dumps(towns)
+    gauges_json = _json.dumps(wet_gauges)
 
-    for g in gauges:
-        if g["wet"] and g["lat"]:
-            x, y = project(g["lat"], g["lon"])
-            r = 14 + min(g["mm"], 20)
-            parts.append(f'<circle cx="{x:.0f}" cy="{y:.0f}" r="{r:.0f}" fill="none" '
-                         f'stroke="#e8654d" stroke-width="2"><title>{g["name"]}: {g["mm"]:.1f}mm</title></circle>')
+    return f"""
+    <div id="sg-map" style="height:440px;border-radius:8px;overflow:hidden;"></div>
+    <script>
+    (function() {{
+      var map = L.map('sg-map', {{scrollWheelZoom: false}}).setView([1.352, 103.82], 11);
+      L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        maxZoom: 18
+      }}).addTo(map);
 
-    for a in areas:
-        if not a["lat"]:
-            continue
-        x, y = project(a["lat"], a["lon"])
-        parts.append(f'<text x="{x:.0f}" y="{y:.0f}" font-size="20" text-anchor="middle" '
-                     f'dominant-baseline="central">{a["icon"]}<title>{a["name"]}: {a["text"]}</title></text>')
-        parts.append(f'<text x="{x:.0f}" y="{y+14:.0f}" font-size="8" text-anchor="middle" '
-                     f'fill="#dce6ea" font-family="monospace">{a["name"]}</text>')
+      var towns = {towns_json};
+      towns.forEach(function(t) {{
+        var icon = L.divIcon({{
+          html: '<div style="font-size:18px;text-align:center;line-height:1;">' + t.icon +
+                '<div style="font-size:8px;color:#dce6ea;font-family:monospace;white-space:nowrap;">' + t.name + '</div></div>',
+          className: '', iconSize: [60, 30], iconAnchor: [30, 15]
+        }});
+        L.marker([t.lat, t.lon], {{icon: icon}}).addTo(map).bindTooltip(t.name + ': ' + t.text);
+      }});
 
-    parts.append("</svg>")
-    return "".join(parts)
+      var gauges = {gauges_json};
+      gauges.forEach(function(g) {{
+        L.circle([g.lat, g.lon], {{
+          radius: 700 + Math.min(g.mm, 20) * 100,
+          color: '#e8654d', fill: false, weight: 2
+        }}).addTo(map).bindTooltip(g.name + ': ' + g.mm.toFixed(1) + 'mm');
+      }});
+    }})();
+    </script>"""
 
 
 def log_run(areas, gauges, forecast_time, rainfall_time):
@@ -304,7 +359,7 @@ def log_run(areas, gauges, forecast_time, rainfall_time):
                     len(gauges), sum(g["wet"] for g in gauges)])
 
 
-def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity, four_day):
+def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity, four_day, psi_time, psi_readings):
     rain_count = sum(a["is_rain"] for a in areas)
     wet_count = sum(g["wet"] for g in gauges)
     alert = (f'<div class="alert">⚡ {lightning_count} lightning strike(s) in the last 30 minutes — '
@@ -327,6 +382,8 @@ def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, o
 
     html = f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8"><title>Rain Watch SG</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   body {{ background:#0a1420; color:#dce6ea; font-family:-apple-system,system-ui,sans-serif; padding:30px; }}
   .wrap {{ max-width:920px; margin:0 auto; }}
@@ -345,6 +402,7 @@ def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, o
   <div class="sub">forecast updated {to_sgt(forecast_time)} · gauges updated {to_sgt(rainfall_time)}</div>
   {alert}
   {current_weather_html}
+  {build_air_quality_html(psi_time, psi_readings)}
   <div class="stats">
     <div class="stat"><b>{len(areas)}</b><span>Towns in forecast</span></div>
     <div class="stat"><b>{rain_count}</b><span>Forecast as rain/showers</span></div>
@@ -374,15 +432,17 @@ def main():
     lightning_count = get_lightning_count()
     outlook, avg_temp, avg_humidity = get_current_weather()
     four_day = get_four_day_outlook()
+    psi_time, psi_readings = get_psi()
 
     log_run(areas, gauges, forecast_time, rainfall_time)
-    build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity, four_day)
+    build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity, four_day, psi_time, psi_readings)
 
     print(f"Forecast: {len(areas)} towns, {sum(a['is_rain'] for a in areas)} showing rain")
     print(f"Gauges: {len(gauges)} stations, {sum(g['wet'] for g in gauges)} currently wet")
     print(f"Lightning strikes in last 30 min: {lightning_count}")
     print(f"Current weather: {outlook}, avg temp {avg_temp}, avg humidity {avg_humidity}")
     print(f"4-day outlook: {len(four_day)} days fetched")
+    print(f"PSI: {psi_readings}")
     print(f"Report: {os.path.abspath(REPORT_PATH)}")
 
 
