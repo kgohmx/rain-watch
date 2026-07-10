@@ -152,6 +152,46 @@ def get_lightning_count():
         return 0
 
 
+RAIN_CHANCE = [
+    (["thunder", "rain", "shower", "drizzle"], "High"),
+    (["cloudy", "overcast", "hazy", "mist", "fog"], "Medium"),
+    (["fair", "sunny", "clear", "warm", "partly cloudy"], "Low"),
+]
+
+
+def rain_chance_for(text):
+    t = (text or "").lower()
+    for keywords, level in RAIN_CHANCE:
+        if any(k in t for k in keywords):
+            return level
+    return "—"
+
+
+def get_four_day_outlook():
+    """NEA's real outlook horizon tops out at 4 days — there's no genuine
+    7-day Singapore forecast, so this is the furthest-out legitimate data
+    available. Best-effort: any parsing issue just returns an empty list."""
+    try:
+        data = fetch("https://api-open.data.gov.sg/v2/real-time/api/four-day-outlook")
+        latest = data["records"][-1]
+        days = []
+        for f in latest["forecasts"]:
+            temp = f.get("temperature", {})
+            humidity = f.get("relativeHumidity") or f.get("relative_humidity", {})
+            days.append({
+                "label": f.get("day") or f.get("date"),
+                "text": f.get("forecast"),
+                "icon": icon_for(f.get("forecast")),
+                "chance": rain_chance_for(f.get("forecast")),
+                "temp_low": temp.get("low"),
+                "temp_high": temp.get("high"),
+                "humidity_low": humidity.get("low"),
+                "humidity_high": humidity.get("high"),
+            })
+        return days
+    except Exception as e:
+        print(f"  4-day outlook fetch failed (non-fatal): {e}")
+        return []
 def get_current_weather():
     """24-hour general outlook + live average temperature/humidity, for a
     'right now' summary alongside the 2-hour forecast map. Best-effort: if
@@ -185,6 +225,42 @@ def get_current_weather():
         avg_humidity = None
 
     return outlook, avg_temp, avg_humidity
+
+
+def build_outlook_strip(outlook, four_day):
+    cards = []
+    if outlook:
+        cards.append({
+            "label": "Today",
+            "text": outlook["forecast"],
+            "icon": icon_for(outlook["forecast"]),
+            "chance": rain_chance_for(outlook["forecast"]),
+            "temp_low": outlook["temp_low"],
+            "temp_high": outlook["temp_high"],
+            "humidity_low": outlook["humidity_low"],
+            "humidity_high": outlook["humidity_high"],
+        })
+    cards.extend(four_day)
+    if not cards:
+        return ""
+
+    day_html = []
+    for c in cards:
+        day_html.append(f"""
+        <div style="flex:1;min-width:120px;background:#0c1c2c;border:1px solid #1c3a4f;border-radius:8px;padding:12px;text-align:center;">
+          <div style="font-size:11px;color:#7f9aab;text-transform:uppercase;margin-bottom:6px;">{c['label']}</div>
+          <div style="font-size:26px;">{c['icon']}</div>
+          <div style="font-size:11px;color:#dce6ea;margin:4px 0;">{c['text']}</div>
+          <div style="font-family:monospace;font-size:12px;color:#37c9a1;">{c['temp_low']}–{c['temp_high']}°C</div>
+          <div style="font-family:monospace;font-size:11px;color:#7f9aab;">{c['humidity_low']}–{c['humidity_high']}% humidity</div>
+          <div style="font-size:11px;color:#e8a24d;margin-top:4px;">Rain chance: {c['chance']}</div>
+        </div>""")
+
+    return f"""
+  <div class="panel" style="margin-top:18px;">
+    <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">4-day outlook (NEA doesn't forecast further than this for Singapore)</h2>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">{"".join(day_html)}</div>
+  </div>"""
 
 
 def build_map(areas, gauges):
@@ -228,7 +304,7 @@ def log_run(areas, gauges, forecast_time, rainfall_time):
                     len(gauges), sum(g["wet"] for g in gauges)])
 
 
-def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity):
+def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity, four_day):
     rain_count = sum(a["is_rain"] for a in areas)
     wet_count = sum(g["wet"] for g in gauges)
     alert = (f'<div class="alert">⚡ {lightning_count} lightning strike(s) in the last 30 minutes — '
@@ -283,6 +359,7 @@ def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, o
       <span style="color:#e8654d;">◯ = gauge recording rain now</span>
     </div>
   </div>
+  {build_outlook_strip(outlook, four_day)}
   <footer>Data: data.gov.sg / NEA. All times shown in Singapore time (UTC+8). Log: {LOG_PATH}</footer>
 </div></body></html>"""
 
@@ -296,14 +373,16 @@ def main():
     rainfall_time, gauges = get_rainfall()
     lightning_count = get_lightning_count()
     outlook, avg_temp, avg_humidity = get_current_weather()
+    four_day = get_four_day_outlook()
 
     log_run(areas, gauges, forecast_time, rainfall_time)
-    build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity)
+    build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, outlook, avg_temp, avg_humidity, four_day)
 
     print(f"Forecast: {len(areas)} towns, {sum(a['is_rain'] for a in areas)} showing rain")
     print(f"Gauges: {len(gauges)} stations, {sum(g['wet'] for g in gauges)} currently wet")
     print(f"Lightning strikes in last 30 min: {lightning_count}")
     print(f"Current weather: {outlook}, avg temp {avg_temp}, avg humidity {avg_humidity}")
+    print(f"4-day outlook: {len(four_day)} days fetched")
     print(f"Report: {os.path.abspath(REPORT_PATH)}")
 
 
