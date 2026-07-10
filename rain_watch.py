@@ -314,8 +314,16 @@ def build_map(areas, gauges):
         {"lat": g["lat"], "lon": g["lon"], "mm": g["mm"], "name": g["name"]}
         for g in gauges if g["wet"] and g["lat"]
     ]
+    # Heat points from ALL gauges with actual rainfall (not just the "wet"
+    # threshold ones) — this approximates the storm-patch look of NEA's
+    # radar, but built from real gauge readings rather than radar imagery
+    # itself (which isn't available as an open API).
+    heat_points = [
+        [g["lat"], g["lon"], g["mm"]] for g in gauges if g["lat"] and g["mm"] and g["mm"] > 0
+    ]
     towns_json = _json.dumps(towns)
     gauges_json = _json.dumps(wet_gauges)
+    heat_json = _json.dumps(heat_points)
 
     return f"""
     <div id="sg-map" style="height:440px;border-radius:8px;overflow:hidden;"></div>
@@ -326,6 +334,14 @@ def build_map(areas, gauges):
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
         maxZoom: 18
       }}).addTo(map);
+
+      var heatPoints = {heat_json};
+      if (heatPoints.length > 0) {{
+        L.heatLayer(heatPoints, {{
+          radius: 45, blur: 35, max: 8, minOpacity: 0.35,
+          gradient: {{0.0: '#00e5ff', 0.25: '#00e676', 0.5: '#ffee00', 0.75: '#ff9100', 1.0: '#ff00c8'}}
+        }}).addTo(map);
+      }}
 
       var towns = {towns_json};
       towns.forEach(function(t) {{
@@ -386,6 +402,7 @@ def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, o
 <html lang="en"><head><meta charset="UTF-8"><title>Rain Watch SG</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
   body {{ background:#0a1420; color:#dce6ea; font-family:-apple-system,system-ui,sans-serif; padding:30px; }}
   .wrap {{ max-width:920px; margin:0 auto; }}
@@ -417,6 +434,14 @@ def build_report(forecast_time, areas, rainfall_time, gauges, lightning_count, o
       <span>☀️ sunny</span><span>⛅ partly cloudy</span><span>☁️ cloudy</span>
       <span>🌦️ light rain</span><span>🌧️ rain</span><span>⛈️ thundery</span><span>🌫️ hazy</span>
       <span style="color:#e8654d;">◯ = gauge recording rain now</span>
+    </div>
+    <div class="legend" style="margin-top:4px;">
+      <span>Rain intensity (from gauge data):</span>
+      <span style="color:#00e5ff;">■ Light</span>
+      <span style="color:#00e676;">■</span>
+      <span style="color:#ffee00;">■ Moderate</span>
+      <span style="color:#ff9100;">■</span>
+      <span style="color:#ff00c8;">■ Heavy</span>
     </div>
   </div>
   {build_outlook_strip(outlook, four_day)}
