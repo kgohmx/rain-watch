@@ -160,11 +160,13 @@ def get_four_day_outlook():
         for f in latest["forecasts"]:
             temp = f.get("temperature", {})
             humidity = f.get("relativeHumidity") or f.get("relative_humidity", {})
+            fc = f.get("forecast", {})
+            desc = fc.get("summary") or fc.get("text")
             days.append({
                 "label": f.get("day") or f.get("date"),
-                "text": f.get("forecast"),
-                "icon": icon_for(f.get("forecast")),
-                "chance": rain_chance_for(f.get("forecast")),
+                "text": desc,
+                "icon": icon_for(desc),
+                "chance": rain_chance_for(desc),
                 "temp_low": temp.get("low"),
                 "temp_high": temp.get("high"),
                 "humidity_low": humidity.get("low"),
@@ -214,11 +216,11 @@ def get_current_weather():
         outlook_data = fetch("https://api-open.data.gov.sg/v2/real-time/api/twenty-four-hr-forecast")
         general = outlook_data["records"][-1]["general"]
         outlook = {
-            "forecast": general["forecast"],
+            "forecast": general["forecast"]["text"],
             "temp_low": general["temperature"]["low"],
             "temp_high": general["temperature"]["high"],
-            "humidity_low": general["relative_humidity"]["low"],
-            "humidity_high": general["relative_humidity"]["high"],
+            "humidity_low": general["relativeHumidity"]["low"],
+            "humidity_high": general["relativeHumidity"]["high"],
         }
     except Exception as e:
         print(f"  24hr outlook fetch failed (non-fatal): {e}")
