@@ -18,18 +18,42 @@
 </style></head>
 <body><div class="wrap">
   <h1>Rain Watch SG</h1>
-  <div class="sub">forecast updated 2026-07-17 12:26 SGT (UTC+8) · gauges updated 2026-07-17 12:20 SGT (UTC+8)</div>
+  <div class="sub">forecast updated 2026-07-17 14:56 SGT (UTC+8) · gauges updated 2026-07-17 14:50 SGT (UTC+8)</div>
   
   
   <div class="panel" style="margin-bottom:18px;">
     <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">Current weather — Thundery Showers</h2>
-    <div class="stats" style="margin-bottom:0;"><div class="stat"><b>29.2°C</b><span>Current avg. temperature</span></div><div class="stat"><b>78%</b><span>Current avg. humidity</span></div><div class="stat"><b>25–33°C</b><span>Today's range</span></div></div>
+    <div class="stats" style="margin-bottom:0;"><div class="stat"><b>26.8°C</b><span>Current avg. temperature</span></div><div class="stat"><b>88%</b><span>Current avg. humidity</span></div><div class="stat"><b>25–33°C</b><span>Today's range</span></div></div>
   </div>
   
+  <div class="panel" style="margin-bottom:18px;">
+    <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">Air quality (PSI, 24-hr) — updated 2026-07-17 14:00 SGT (UTC+8)</h2>
+    <div class="stats" style="margin-bottom:0;">
+        <div class="stat">
+          <b style="color:#8fb8d9;">54</b>
+          <span>North — Moderate</span>
+        </div>
+        <div class="stat">
+          <b style="color:#8fb8d9;">51</b>
+          <span>South — Moderate</span>
+        </div>
+        <div class="stat">
+          <b style="color:#8fb8d9;">56</b>
+          <span>East — Moderate</span>
+        </div>
+        <div class="stat">
+          <b style="color:#8fb8d9;">55</b>
+          <span>West — Moderate</span>
+        </div>
+        <div class="stat">
+          <b style="color:#8fb8d9;">59</b>
+          <span>Central — Moderate</span>
+        </div></div>
+  </div>
   <div class="stats">
     <div class="stat"><b>47</b><span>Towns in forecast</span></div>
-    <div class="stat"><b>43</b><span>Forecast as rain/showers</span></div>
-    <div class="stat"><b>9</b><span>Gauges actually recording rain</span></div>
+    <div class="stat"><b>26</b><span>Forecast as rain/showers</span></div>
+    <div class="stat"><b>3</b><span>Gauges actually recording rain</span></div>
   </div>
   <div class="panel">
     <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">Weather by town</h2>
@@ -43,7 +67,7 @@
         maxZoom: 18
       }).addTo(map);
 
-      var heatPoints = [[1.37998, 103.87639, 0.6], [1.29911, 103.88289, 0.6], [1.3418, 103.8339, 2.2], [1.30574, 103.87817, 0.6], [1.2841, 103.7888, 0.2], [1.295, 103.8622, 3.2], [1.2504, 103.8275, 0.2], [1.3214, 103.8577, 0.2], [1.3087, 103.818, 0.2], [1.27472, 103.80389, 0.2], [1.29984, 103.80264, 2.4], [1.39027, 103.87412, 0.2], [1.2937, 103.8127, 1.2], [1.3003, 103.8372, 0.4], [1.3106, 103.8365, 0.8]];
+      var heatPoints = [[1.32427, 103.8097, 0.4], [1.28987, 103.82364, 0.2], [1.3191, 103.8193, 0.6], [1.2841, 103.7888, 0.2], [1.295, 103.8622, 0.2], [1.3214, 103.8577, 0.2], [1.2799, 103.8703, 0.2], [1.27472, 103.80389, 0.2], [1.31622, 103.7837, 0.2], [1.3003, 103.8372, 0.4]];
       if (heatPoints.length > 0) {
         L.heatLayer(heatPoints, {
           radius: 45, blur: 35, max: 8, minOpacity: 0.35,
@@ -51,7 +75,7 @@
         }).addTo(map);
       }
 
-      var towns = [{"lat": 1.375, "lon": 103.839, "icon": "\u26c8\ufe0f", "name": "Ang Mo Kio", "text": "Thundery Showers"}, {"lat": 1.321, "lon": 103.924, "icon": "\u26c8\ufe0f", "name": "Bedok", "text": "Thundery Showers"}, {"lat": 1.350772, "lon": 103.839, "icon": "\u26c8\ufe0f", "name": "Bishan", "text": "Thundery Showers"}, {"lat": 1.304, "lon": 103.701, "icon": "\ud83c\udf26\ufe0f", "name": "Boon Lay", "text": "Showers"}, {"lat": 1.353, "lon": 103.754, "icon": "\ud83c\udf26\ufe0f", "name": "Bukit Batok", "text": "Showers"}, {"lat": 1.277, "lon": 103.819, "icon": "\u26c8\ufe0f", "name": "Bukit Merah", "text": "Thundery Showers"}, {"lat": 1.362, "lon": 103.77195, "icon": "\ud83c\udf26\ufe0f", "name": "Bukit Panjang", "text": "Showers"}, {"lat": 1.325, "lon": 103.791, "icon": "\ud83c\udf26\ufe0f", "name": "Bukit Timah", "text": "Showers"}, {"lat": 1.38, "lon": 103.805, "icon": "\u26c8\ufe0f", "name": "Central Water Catchment", "text": "Thundery Showers"}, {"lat": 1.357, "lon": 103.987, "icon": "\u2601\ufe0f", "name": "Changi", "text": "Cloudy"}, {"lat": 1.377, "lon": 103.745, "icon": "\ud83c\udf26\ufe0f", "name": "Choa Chu Kang", "text": "Showers"}, {"lat": 1.292, "lon": 103.844, "icon": "\u26c8\ufe0f", "name": "City", "text": "Thundery Showers"}, {"lat": 1.315, "lon": 103.76, "icon": "\ud83c\udf26\ufe0f", "name": "Clementi", "text": "Showers"}, {"lat": 1.318, "lon": 103.884, "icon": "\u26c8\ufe0f", "name": "Geylang", "text": "Thundery Showers"}, {"lat": 1.361218, "lon": 103.886, "icon": "\u26c8\ufe0f", "name": "Hougang", "text": "Thundery Showers"}, {"lat": 1.347, "lon": 103.67, "icon": "\ud83c\udf26\ufe0f", "name": "Jalan Bahar", "text": "Showers"}, {"lat": 1.326, "lon": 103.737, "icon": "\ud83c\udf26\ufe0f", "name": "Jurong East", "text": "Showers"}, {"lat": 1.266, "lon": 103.699, "icon": "\ud83c\udf26\ufe0f", "name": "Jurong Island", "text": "Showers"}, {"lat": 1.34039, "lon": 103.705, "icon": "\ud83c\udf26\ufe0f", "name": "Jurong West", "text": "Showers"}, {"lat": 1.312, "lon": 103.862, "icon": "\u26c8\ufe0f", "name": "Kallang", "text": "Thundery Showers"}, {"lat": 1.423, "lon": 103.717332, "icon": "\ud83c\udf26\ufe0f", "name": "Lim Chu Kang", "text": "Showers"}, {"lat": 1.419, "lon": 103.812, "icon": "\ud83c\udf26\ufe0f", "name": "Mandai", "text": "Showers"}, {"lat": 1.297, "lon": 103.891, "icon": "\u26c8\ufe0f", "name": "Marine Parade", "text": "Thundery Showers"}, {"lat": 1.327, "lon": 103.826, "icon": "\u26c8\ufe0f", "name": "Novena", "text": "Thundery Showers"}, {"lat": 1.37, "lon": 103.948, "icon": "\u2601\ufe0f", "name": "Pasir Ris", "text": "Cloudy"}, {"lat": 1.358, "lon": 103.914, "icon": "\u26c8\ufe0f", "name": "Paya Lebar", "text": "Thundery Showers"}, {"lat": 1.315, "lon": 103.675, "icon": "\ud83c\udf26\ufe0f", "name": "Pioneer", "text": "Showers"}, {"lat": 1.403, "lon": 104.053, "icon": "\u2601\ufe0f", "name": "Pulau Tekong", "text": "Cloudy"}, {"lat": 1.404, "lon": 103.96, "icon": "\u2601\ufe0f", "name": "Pulau Ubin", "text": "Cloudy"}, {"lat": 1.401, "lon": 103.904, "icon": "\u26c8\ufe0f", "name": "Punggol", "text": "Thundery Showers"}, {"lat": 1.291, "lon": 103.78576, "icon": "\u26c8\ufe0f", "name": "Queenstown", "text": "Thundery Showers"}, {"lat": 1.404, "lon": 103.869, "icon": "\u26c8\ufe0f", "name": "Seletar", "text": "Thundery Showers"}, {"lat": 1.445, "lon": 103.818495, "icon": "\ud83c\udf26\ufe0f", "name": "Sembawang", "text": "Showers"}, {"lat": 1.384, "lon": 103.891443, "icon": "\u26c8\ufe0f", "name": "Sengkang", "text": "Thundery Showers"}, {"lat": 1.243, "lon": 103.832, "icon": "\u26c8\ufe0f", "name": "Sentosa", "text": "Thundery Showers"}, {"lat": 1.357, "lon": 103.865, "icon": "\u26c8\ufe0f", "name": "Serangoon", "text": "Thundery Showers"}, {"lat": 1.208, "lon": 103.842, "icon": "\u26c8\ufe0f", "name": "Southern Islands", "text": "Thundery Showers"}, {"lat": 1.413, "lon": 103.756, "icon": "\ud83c\udf26\ufe0f", "name": "Sungei Kadut", "text": "Showers"}, {"lat": 1.345, "lon": 103.944, "icon": "\u26c8\ufe0f", "name": "Tampines", "text": "Thundery Showers"}, {"lat": 1.308, "lon": 103.813, "icon": "\u26c8\ufe0f", "name": "Tanglin", "text": "Thundery Showers"}, {"lat": 1.374, "lon": 103.715, "icon": "\ud83c\udf26\ufe0f", "name": "Tengah", "text": "Showers"}, {"lat": 1.334304, "lon": 103.856327, "icon": "\u26c8\ufe0f", "name": "Toa Payoh", "text": "Thundery Showers"}, {"lat": 1.294947, "lon": 103.635, "icon": "\ud83c\udf26\ufe0f", "name": "Tuas", "text": "Showers"}, {"lat": 1.205926, "lon": 103.746, "icon": "\u26c8\ufe0f", "name": "Western Islands", "text": "Thundery Showers"}, {"lat": 1.405, "lon": 103.689, "icon": "\ud83c\udf26\ufe0f", "name": "Western Water Catchment", "text": "Showers"}, {"lat": 1.432, "lon": 103.786528, "icon": "\ud83c\udf26\ufe0f", "name": "Woodlands", "text": "Showers"}, {"lat": 1.418, "lon": 103.839, "icon": "\u26c8\ufe0f", "name": "Yishun", "text": "Thundery Showers"}];
+      var towns = [{"lat": 1.375, "lon": 103.839, "icon": "\u2601\ufe0f", "name": "Ang Mo Kio", "text": "Cloudy"}, {"lat": 1.321, "lon": 103.924, "icon": "\u2601\ufe0f", "name": "Bedok", "text": "Cloudy"}, {"lat": 1.350772, "lon": 103.839, "icon": "\u2601\ufe0f", "name": "Bishan", "text": "Cloudy"}, {"lat": 1.304, "lon": 103.701, "icon": "\ud83c\udf26\ufe0f", "name": "Boon Lay", "text": "Showers"}, {"lat": 1.353, "lon": 103.754, "icon": "\ud83c\udf26\ufe0f", "name": "Bukit Batok", "text": "Showers"}, {"lat": 1.277, "lon": 103.819, "icon": "\ud83c\udf26\ufe0f", "name": "Bukit Merah", "text": "Showers"}, {"lat": 1.362, "lon": 103.77195, "icon": "\ud83c\udf26\ufe0f", "name": "Bukit Panjang", "text": "Showers"}, {"lat": 1.325, "lon": 103.791, "icon": "\ud83c\udf26\ufe0f", "name": "Bukit Timah", "text": "Showers"}, {"lat": 1.38, "lon": 103.805, "icon": "\u2601\ufe0f", "name": "Central Water Catchment", "text": "Cloudy"}, {"lat": 1.357, "lon": 103.987, "icon": "\u2601\ufe0f", "name": "Changi", "text": "Cloudy"}, {"lat": 1.377, "lon": 103.745, "icon": "\ud83c\udf26\ufe0f", "name": "Choa Chu Kang", "text": "Showers"}, {"lat": 1.292, "lon": 103.844, "icon": "\ud83c\udf26\ufe0f", "name": "City", "text": "Showers"}, {"lat": 1.315, "lon": 103.76, "icon": "\ud83c\udf26\ufe0f", "name": "Clementi", "text": "Showers"}, {"lat": 1.318, "lon": 103.884, "icon": "\u2601\ufe0f", "name": "Geylang", "text": "Cloudy"}, {"lat": 1.361218, "lon": 103.886, "icon": "\u2601\ufe0f", "name": "Hougang", "text": "Cloudy"}, {"lat": 1.347, "lon": 103.67, "icon": "\ud83c\udf26\ufe0f", "name": "Jalan Bahar", "text": "Showers"}, {"lat": 1.326, "lon": 103.737, "icon": "\ud83c\udf26\ufe0f", "name": "Jurong East", "text": "Showers"}, {"lat": 1.266, "lon": 103.699, "icon": "\ud83c\udf26\ufe0f", "name": "Jurong Island", "text": "Showers"}, {"lat": 1.34039, "lon": 103.705, "icon": "\ud83c\udf26\ufe0f", "name": "Jurong West", "text": "Showers"}, {"lat": 1.312, "lon": 103.862, "icon": "\ud83c\udf26\ufe0f", "name": "Kallang", "text": "Showers"}, {"lat": 1.423, "lon": 103.717332, "icon": "\ud83c\udf26\ufe0f", "name": "Lim Chu Kang", "text": "Showers"}, {"lat": 1.419, "lon": 103.812, "icon": "\u2601\ufe0f", "name": "Mandai", "text": "Cloudy"}, {"lat": 1.297, "lon": 103.891, "icon": "\ud83c\udf26\ufe0f", "name": "Marine Parade", "text": "Showers"}, {"lat": 1.327, "lon": 103.826, "icon": "\ud83c\udf26\ufe0f", "name": "Novena", "text": "Showers"}, {"lat": 1.37, "lon": 103.948, "icon": "\u2601\ufe0f", "name": "Pasir Ris", "text": "Cloudy"}, {"lat": 1.358, "lon": 103.914, "icon": "\u2601\ufe0f", "name": "Paya Lebar", "text": "Cloudy"}, {"lat": 1.315, "lon": 103.675, "icon": "\ud83c\udf26\ufe0f", "name": "Pioneer", "text": "Showers"}, {"lat": 1.403, "lon": 104.053, "icon": "\u2601\ufe0f", "name": "Pulau Tekong", "text": "Cloudy"}, {"lat": 1.404, "lon": 103.96, "icon": "\u2601\ufe0f", "name": "Pulau Ubin", "text": "Cloudy"}, {"lat": 1.401, "lon": 103.904, "icon": "\u2601\ufe0f", "name": "Punggol", "text": "Cloudy"}, {"lat": 1.291, "lon": 103.78576, "icon": "\ud83c\udf26\ufe0f", "name": "Queenstown", "text": "Showers"}, {"lat": 1.404, "lon": 103.869, "icon": "\u2601\ufe0f", "name": "Seletar", "text": "Cloudy"}, {"lat": 1.445, "lon": 103.818495, "icon": "\u2601\ufe0f", "name": "Sembawang", "text": "Cloudy"}, {"lat": 1.384, "lon": 103.891443, "icon": "\u2601\ufe0f", "name": "Sengkang", "text": "Cloudy"}, {"lat": 1.243, "lon": 103.832, "icon": "\ud83c\udf26\ufe0f", "name": "Sentosa", "text": "Showers"}, {"lat": 1.357, "lon": 103.865, "icon": "\u2601\ufe0f", "name": "Serangoon", "text": "Cloudy"}, {"lat": 1.208, "lon": 103.842, "icon": "\ud83c\udf26\ufe0f", "name": "Southern Islands", "text": "Showers"}, {"lat": 1.413, "lon": 103.756, "icon": "\ud83c\udf26\ufe0f", "name": "Sungei Kadut", "text": "Showers"}, {"lat": 1.345, "lon": 103.944, "icon": "\u2601\ufe0f", "name": "Tampines", "text": "Cloudy"}, {"lat": 1.308, "lon": 103.813, "icon": "\ud83c\udf26\ufe0f", "name": "Tanglin", "text": "Showers"}, {"lat": 1.374, "lon": 103.715, "icon": "\ud83c\udf26\ufe0f", "name": "Tengah", "text": "Showers"}, {"lat": 1.334304, "lon": 103.856327, "icon": "\u2601\ufe0f", "name": "Toa Payoh", "text": "Cloudy"}, {"lat": 1.294947, "lon": 103.635, "icon": "\ud83c\udf26\ufe0f", "name": "Tuas", "text": "Showers"}, {"lat": 1.205926, "lon": 103.746, "icon": "\ud83c\udf26\ufe0f", "name": "Western Islands", "text": "Showers"}, {"lat": 1.405, "lon": 103.689, "icon": "\ud83c\udf26\ufe0f", "name": "Western Water Catchment", "text": "Showers"}, {"lat": 1.432, "lon": 103.786528, "icon": "\u2601\ufe0f", "name": "Woodlands", "text": "Cloudy"}, {"lat": 1.418, "lon": 103.839, "icon": "\u2601\ufe0f", "name": "Yishun", "text": "Cloudy"}];
       towns.forEach(function(t) {
         var icon = L.divIcon({
           html: '<div style="font-size:18px;text-align:center;line-height:1;">' + t.icon +
@@ -61,7 +85,7 @@
         L.marker([t.lat, t.lon], {icon: icon}).addTo(map).bindTooltip(t.name + ': ' + t.text);
       });
 
-      var gauges = [{"lat": 1.37998, "lon": 103.87639, "mm": 0.6, "name": "Yio Chu Kang Road"}, {"lat": 1.29911, "lon": 103.88289, "mm": 0.6, "name": "Tanjong Rhu"}, {"lat": 1.3418, "lon": 103.8339, "mm": 2.2, "name": "Lornie Road"}, {"lat": 1.30574, "lon": 103.87817, "mm": 0.6, "name": "Kallang Practice Track"}, {"lat": 1.295, "lon": 103.8622, "mm": 3.2, "name": "Nicoll Highway"}, {"lat": 1.29984, "lon": 103.80264, "mm": 2.4, "name": "Margaret Drive"}, {"lat": 1.2937, "lon": 103.8127, "mm": 1.2, "name": "Alexandra Road"}, {"lat": 1.3003, "lon": 103.8372, "mm": 0.4, "name": "Somerset Road"}, {"lat": 1.3106, "lon": 103.8365, "mm": 0.8, "name": "Scotts Road"}];
+      var gauges = [{"lat": 1.32427, "lon": 103.8097, "mm": 0.4, "name": "Coronation Walk"}, {"lat": 1.3191, "lon": 103.8193, "mm": 0.6, "name": "Bukit Timah Road"}, {"lat": 1.3003, "lon": 103.8372, "mm": 0.4, "name": "Somerset Road"}];
       gauges.forEach(function(g) {
         L.circle([g.lat, g.lon], {
           radius: 700 + Math.min(g.mm, 20) * 100,
