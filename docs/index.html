@@ -18,18 +18,18 @@
 </style></head>
 <body><div class="wrap">
   <h1>Rain Watch SG</h1>
-  <div class="sub">forecast updated 2026-07-18 21:41 SGT (UTC+8) · gauges updated 2026-07-18 21:45 SGT (UTC+8)</div>
+  <div class="sub">forecast updated 2026-07-18 22:36 SGT (UTC+8) · gauges updated 2026-07-18 22:55 SGT (UTC+8)</div>
   
   
   <div class="panel" style="margin-bottom:18px;">
     <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">Current weather — Showers</h2>
-    <div class="stats" style="margin-bottom:0;"><div class="stat"><b>27.3°C</b><span>Current avg. temperature</span></div><div class="stat"><b>88%</b><span>Current avg. humidity</span></div><div class="stat"><b>25–34°C</b><span>Today's range</span></div></div>
+    <div class="stats" style="margin-bottom:0;"><div class="stat"><b>27.5°C</b><span>Current avg. temperature</span></div><div class="stat"><b>87%</b><span>Current avg. humidity</span></div><div class="stat"><b>25–34°C</b><span>Today's range</span></div></div>
   </div>
   
   <div class="stats">
     <div class="stat"><b>47</b><span>Towns in forecast</span></div>
     <div class="stat"><b>0</b><span>Forecast as rain/showers</span></div>
-    <div class="stat"><b>0</b><span>Gauges actually recording rain</span></div>
+    <div class="stat"><b>2</b><span>Gauges actually recording rain</span></div>
   </div>
   <div class="panel">
     <h2 style="font-size:12px;text-transform:uppercase;color:#7f9aab;margin:0 0 10px;">Weather by town</h2>
@@ -43,7 +43,7 @@
         maxZoom: 18
       }).addTo(map);
 
-      var heatPoints = [];
+      var heatPoints = [[1.37998, 103.87639, 0.2], [1.4028, 103.9095, 1.2], [1.38666, 103.89797, 0.2], [1.38256, 103.89852, 0.2], [1.39316, 103.87412, 0.6]];
       if (heatPoints.length > 0) {
         L.heatLayer(heatPoints, {
           radius: 45, blur: 35, max: 8, minOpacity: 0.35,
@@ -61,7 +61,7 @@
         L.marker([t.lat, t.lon], {icon: icon}).addTo(map).bindTooltip(t.name + ': ' + t.text);
       });
 
-      var gauges = [];
+      var gauges = [{"lat": 1.4028, "lon": 103.9095, "mm": 1.2, "name": "Punggol Central"}, {"lat": 1.39316, "lon": 103.87412, "mm": 0.6, "name": "S907"}];
       gauges.forEach(function(g) {
         L.circle([g.lat, g.lon], {
           radius: 700 + Math.min(g.mm, 20) * 100,
